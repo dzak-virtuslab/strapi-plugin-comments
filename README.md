@@ -179,6 +179,8 @@ module.exports = ({ env }) => ({
 - `blockedAuthorProps` - list of author's entity properties removed from a response for client side
 - `reactionsEnabled` - stored in the plugin settings (Comments → **Settings**). When `true` and the [Reactions plugin](#reactions-integration) is installed and enabled, comment responses in REST and GraphQL include reaction counts. If the setting is missing or the Reactions plugin is not present, integration stays off regardless of other defaults.
 
+> **Note:** When a reply (`threadOf`) is created, the author of the parent comment is notified by email using the built-in [Strapi email plugin](https://docs.strapi.io/dev-docs/plugins/email). This notification is best-effort and runs in the background: the API response does not wait for it, and if the email plugin is missing or sending fails, the problem is only logged and the comment is still created.
+
 ## Additional GQL Configuration
 
 All you need to do is to install and enable `@strapi/plugin-graphql` for you instance based on the **[official Strapi v4 docs](https://docs.strapi.io/dev-docs/plugins/graphql#configurations)** and decide if you would like to call it by anyone (open for world) or only by authenticated users (Strapi users).
