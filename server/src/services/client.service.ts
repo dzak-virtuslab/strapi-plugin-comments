@@ -102,11 +102,12 @@ export const clientService = ({ strapi }: StrapiContext) => {
       };
       const sanitizedEntity = this.getCommonService().sanitizeCommentEntity(entity, doNotPopulateAuthor);
 
-      try {
-        await this.sendResponseNotification(sanitizedEntity);
-      } catch (error) {
-        strapi.log.error(error);
-      }
+      // Reply notifications are best-effort: do not block the response on the email provider
+      Promise.resolve()
+        .then(() => this.sendResponseNotification(sanitizedEntity))
+        .catch((error) => {
+          strapi.log.error(error);
+        });
 
       try {
         await this.getCommonService().runLifecycleHook({
@@ -296,6 +297,11 @@ export const clientService = ({ strapi }: StrapiContext) => {
 
     async sendResponseNotification(entity: Comment) {
       if (entity.threadOf) {
+        if (!strapi.plugin('email')?.service('email')) {
+          strapi.log.warn('Email plugin not available, skipping response notification');
+          return;
+        }
+
         const thread = typeof entity.threadOf === 'object' ? entity.threadOf : await this.getCommonService().findOne({ id: entity.threadOf });
         let emailRecipient = thread?.author?.email;
         if (thread.authorUser && !emailRecipient) {
@@ -313,7 +319,7 @@ export const clientService = ({ strapi }: StrapiContext) => {
               },
             });
 
-          const emailSender = await this.getCommonService().getConfig('client.contactEmail', superAdmin.email);
+          const emailSender = await this.getCommonService().getConfig('client.contactEmail', superAdmin?.email);
           const clientAppUrl = await this.getCommonService().getConfig('client.url', 'our site');
 
           if (!emailSender || !clientAppUrl) {
