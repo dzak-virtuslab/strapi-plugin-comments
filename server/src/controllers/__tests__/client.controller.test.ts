@@ -48,6 +48,7 @@ describe('Client controller', () => {
     approveComment: jest.fn(),
     rejectComment: jest.fn(),
     resolveAbuseReport: jest.fn(),
+    reopenAbuseReport: jest.fn(),
     resolveCommentMultipleAbuseReports: jest.fn(),
     resolveAllAbuseReportsForComment: jest.fn(),
     resolveAllAbuseReportsForThread: jest.fn(),
@@ -917,6 +918,53 @@ describe('Client controller', () => {
       });
 
       await expect(getController(getStrapi()).resolveAbuseReport(ctx)).rejects.toThrow();
+    });
+  });
+
+  describe('reopenAbuseReport', () => {
+    it('should reopen single report when validation passes', async () => {
+      const ctx = {
+        params: { relation: 'test', commentId: '1', reportId: '9' },
+      } as RequestContext<any, any, any>;
+      const config = { enabledCollections: ['test'] };
+      const validated = { relation: 'test', commentId: 1, reportId: 9 };
+      const expected = { id: 9, resolved: false };
+
+      mockStoreRepository.get.mockResolvedValue({ right: config });
+      caster<jest.Mock>(clientValidator.resolveAbuseReportValidator).mockReturnValue({ right: validated });
+      mockCommonService.reopenAbuseReport.mockResolvedValue(expected);
+
+      const result = await getController(getStrapi()).reopenAbuseReport(ctx);
+
+      expect(result).toEqual(expected);
+      expect(clientValidator.resolveAbuseReportValidator).toHaveBeenCalledWith(['test'], ctx.params);
+      expect(mockCommonService.reopenAbuseReport).toHaveBeenCalledWith(1, 9);
+    });
+
+    it('should throw when store config fails', async () => {
+      const ctx = {
+        params: { relation: 'test', commentId: '1', reportId: '9' },
+      } as RequestContext<any, any, any>;
+
+      mockStoreRepository.get.mockResolvedValue({ left: new Error('fail') });
+
+      await expect(getController(getStrapi()).reopenAbuseReport(ctx)).rejects.toThrow();
+      expect(mockCommonService.reopenAbuseReport).not.toHaveBeenCalled();
+    });
+
+    it('should throw when validator fails', async () => {
+      const ctx = {
+        params: { relation: 'test', commentId: '1', reportId: '9' },
+      } as RequestContext<any, any, any>;
+      const config = { enabledCollections: ['test'] };
+
+      mockStoreRepository.get.mockResolvedValue({ right: config });
+      caster<jest.Mock>(clientValidator.resolveAbuseReportValidator).mockReturnValue({
+        left: new Error('Validation failed'),
+      });
+
+      await expect(getController(getStrapi()).reopenAbuseReport(ctx)).rejects.toThrow();
+      expect(mockCommonService.reopenAbuseReport).not.toHaveBeenCalled();
     });
   });
 

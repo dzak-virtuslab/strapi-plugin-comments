@@ -239,6 +239,22 @@ const controllers = ({ strapi }: StrapiContext) => ({
     throw throwError(ctx, unwrapEither(configResult));
   },
 
+  async reopenAbuseReport(
+    ctx: RequestContext<object, Pick<clientValidator.ResolveAbuseReportValidatorSchema, 'relation' | 'commentId' | 'reportId'>>
+  ) {
+    const configResult = await this.getStoreRepository().get(true);
+    if (isRight(configResult)) {
+      const config = unwrapEither(configResult);
+      const result = clientValidator.resolveAbuseReportValidator(config.enabledCollections, ctx.params);
+      if (isRight(result)) {
+        const { commentId, reportId } = unwrapEither(result);
+        return this.getService('common').reopenAbuseReport(commentId, reportId);
+      }
+      throw throwError(ctx, unwrapEither(result));
+    }
+    throw throwError(ctx, unwrapEither(configResult));
+  },
+
   async resolveCommentMultipleAbuseReports(
     ctx: RequestContext<{ reportIds: number[] }, Pick<clientValidator.ResolveCommentMultipleAbuseReportsValidatorSchema, 'relation' | 'commentId'>>
   ) {

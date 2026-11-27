@@ -145,6 +145,20 @@ const routes: StrapiRoute<'client'>[] = [
   },
   {
     method: 'PUT',
+    path: '/:relation/moderate/single/:commentId/report/:reportId/reopen',
+    handler: 'client.reopenAbuseReport',
+    config: {
+      policies: [],
+      description: 'Reopen a single resolved abuse report for a comment',
+      tag: {
+        plugin: 'comments',
+        name: 'Comments',
+        actionType: 'update',
+      },
+    },
+  },
+  {
+    method: 'PUT',
     path: '/:relation/moderate/single/:commentId/report/resolve',
     handler: 'client.resolveCommentMultipleAbuseReports',
     config: {
