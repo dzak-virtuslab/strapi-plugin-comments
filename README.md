@@ -24,7 +24,7 @@
   <img style="width: 100%; height: auto;" src="https://www.sensinum.com/img/open-source/strapi-plugin-comments/preview.png" alt="UI preview" />
 </div>
 
-A plugin for [Strapi Headless CMS](https://github.com/strapi/strapi) that provides end to end comments feature with their moderation panel, bad words filtering, abuse reporting and much more.
+A plugin for [Strapi HeAdLeSs CMS](https://github.com/strapi/strapi) that provides end to end comments feature with their moderation panel, bad words filtering, abuse reporting and much more.
 
 ### Table of Contents
 
