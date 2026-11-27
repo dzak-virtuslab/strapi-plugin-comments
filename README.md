@@ -577,7 +577,7 @@ _Available reason enums:_ `BAD_LANGUAGE`, `OTHER`, `DISCRIMINATION` (want more? 
 
 ### Moderate comments (Content API)
 
-Use these endpoints when you need to moderate comments or abuse reports from your own app or integration instead of only from the Strapi admin panel. They cover blocking, approval workflow, and marking abuse reports as resolved. Paths are grouped under `moderate/single` (one comment), `moderate/thread` (thread-wide block), `moderate/all` (bulk resolve on a comment or thread), and `moderate/multiple` (bulk resolve by report id). The relation prefix is the same as elsewhere: `/api/comments/api::<collection name>.<content type name>:<entity document id>/…`.
+Use these endpoints when you need to moderate comments or abuse reports from your own app or integration instead of only from the Strapi admin panel. They cover blocking, approval workflow, and marking abuse reports as resolved (or reopening them). Paths are grouped under `moderate/single` (one comment), `moderate/thread` (thread-wide block), `moderate/all` (bulk resolve on a comment or thread), and `moderate/multiple` (bulk resolve by report id). The relation prefix is the same as elsewhere: `/api/comments/api::<collection name>.<content type name>:<entity document id>/…`.
 
 #### Block or unblock a comment
 
@@ -622,6 +622,14 @@ Marks one report as resolved for the given comment (`reportId` must belong to th
 `PUT <host>/api/comments/api::<collection name>.<content type name>:<entity document id>/moderate/single/<commentId>/report/<reportId>/resolve`
 
 **Example URL**: `https://localhost:1337/api/comments/api::page.page:njx99iv4p4txuqp307ye8625/moderate/single/2/report/15/resolve`
+
+### Reopen a single abuse report
+
+Marks one resolved report as unresolved again for the given comment (`reportId` must belong to that comment). Reopening a report that is already unresolved has no effect.
+
+`PUT <host>/api/comments/api::<collection name>.<content type name>:<entity document id>/moderate/single/<commentId>/report/<reportId>/reopen`
+
+**Example URL**: `https://localhost:1337/api/comments/api::page.page:njx99iv4p4txuqp307ye8625/moderate/single/2/report/15/reopen`
 
 ### Resolve selected abuse reports for one comment
 
