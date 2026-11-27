@@ -74,6 +74,8 @@ describe('client.service', () => {
     error: jest.fn(),
   };
 
+  const mockPlugin = jest.fn();
+
   const mockReactionsService = {
     removeForComments: jest.fn().mockResolvedValue(undefined),
   };
@@ -96,7 +98,10 @@ describe('client.service', () => {
     caster<jest.Mock>(emailService).mockReturnValue({ send: mockEmailSend });
     mockFindOne.mockReset();
     mockUserQuery().findOne.mockReset();
+    mockPlugin.mockReturnValue({ service: jest.fn().mockReturnValue({ send: jest.fn() }) });
   });
+
+  const flushPromises = () => new Promise((resolve) => setImmediate(resolve));
 
   const getStrapi = () =>
     caster<StrapiContext>({
@@ -113,6 +118,7 @@ describe('client.service', () => {
           }
           return { findOne: jest.fn() };
         },
+        plugin: mockPlugin,
         log: mockLog,
       },
     });
@@ -398,9 +404,37 @@ describe('client.service', () => {
       jest.spyOn(service, 'sendResponseNotification').mockRejectedValue(notificationError);
 
       const result = await service.create(mockPayload, mockUser);
+      await flushPromises();
 
       expect(result).toEqual(mockSanitizedEntity);
       expect(mockLog.error).toHaveBeenCalledWith(notificationError);
+    });
+
+    it('should return created comment without waiting for a response notification that never settles', async () => {
+      const strapi = getStrapi();
+      const service = getService(strapi);
+      const mockEntity = { id: 1, content: 'Test comment' };
+      const mockSanitizedEntity = { id: 1, content: 'Clean comment' };
+
+      mockCommonService.parseRelationString.mockReturnValue({
+        uid: 'api::test.test',
+        relatedId: '1',
+      });
+      mockFindOne.mockResolvedValue({ id: 1 });
+      mockCommonService.getConfig.mockResolvedValue([]);
+      mockCommonService.isValidUserContext.mockReturnValue(true);
+      mockCommonService.checkBadWords.mockResolvedValue('Test comment');
+      mockCommentRepository.create.mockResolvedValue(mockEntity);
+      mockCommonService.sanitizeCommentEntity.mockReturnValue(mockSanitizedEntity);
+      const notificationSpy = jest
+        .spyOn(service, 'sendResponseNotification')
+        .mockReturnValue(new Promise(() => {}));
+
+      const result = await service.create(mockPayload, mockUser);
+
+      expect(result).toEqual(mockSanitizedEntity);
+      expect(notificationSpy).toHaveBeenCalledWith(mockSanitizedEntity);
+      expect(mockCommonService.runLifecycleHook).toHaveBeenCalled();
     });
 
     it('should still return created comment when afterCreate lifecycle hook fails', async () => {
@@ -877,6 +911,51 @@ describe('client.service', () => {
   });
 
   describe('sendResponseNotification', () => {
+    it('should skip with a warning when the email plugin is not available', async () => {
+      const strapi = getStrapi();
+      const service = getService(strapi);
+      const entity = {
+        id: 1,
+        content: 'Reply content',
+        threadOf: {
+          id: 10,
+          author: { name: 'Thread Author', email: 'thread@test.com' },
+        },
+        author: { name: 'Replier', email: 'replier@test.com' },
+      };
+      mockPlugin.mockReturnValue(undefined);
+
+      await service.sendResponseNotification(entity as any);
+
+      expect(mockLog.warn).toHaveBeenCalledWith(
+        'Email plugin not available, skipping response notification'
+      );
+      expect(mockAdminUserQuery.findOne).not.toHaveBeenCalled();
+      expect(mockEmailSend).not.toHaveBeenCalled();
+    });
+
+    it('should not throw and not send when no super admin exists', async () => {
+      const strapi = getStrapi();
+      const service = getService(strapi);
+      const entity = {
+        id: 1,
+        content: 'Reply content',
+        threadOf: {
+          id: 10,
+          author: { name: 'Thread Author', email: 'thread@test.com' },
+        },
+        author: { name: 'Replier', email: 'replier@test.com' },
+      };
+
+      mockAdminUserQuery.findOne.mockResolvedValue(null);
+      mockCommonService.getConfig.mockImplementation(async (_key: string, defaultValue: unknown) => defaultValue);
+
+      await expect(service.sendResponseNotification(entity as any)).resolves.toBeUndefined();
+
+      expect(mockLog.warn).toHaveBeenCalledWith('Email sender or client app URL not found');
+      expect(mockEmailSend).not.toHaveBeenCalled();
+    });
+
     it('should send notification email when threadOf has author email', async () => {
       const strapi = getStrapi();
       const service = getService(strapi);
@@ -1069,7 +1148,7 @@ describe('client.service', () => {
       expect(mockEmailSend).not.toHaveBeenCalled();
     });
 
-    it('should throw PluginError(500) when emailService send fails', async () => {
+    it('should log once and not rethrow when emailService send fails', async () => {
       const strapi = getStrapi();
       const service = getService(strapi);
       const entity = {
@@ -1089,12 +1168,9 @@ describe('client.service', () => {
       const sendError = new Error('SMTP down');
       mockEmailSend.mockRejectedValueOnce(sendError);
 
-      await expect(service.sendResponseNotification(entity as any)).rejects.toMatchObject({
-        name: 'Strapi:Plugin:Comments',
-        status: 500,
-        message: 'Failed to send response notification email',
-      });
+      await expect(service.sendResponseNotification(entity as any)).resolves.toBeUndefined();
 
+      expect(mockLog.error).toHaveBeenCalledTimes(1);
       expect(mockLog.error).toHaveBeenCalledWith(sendError);
     });
 
@@ -1146,29 +1222,6 @@ describe('client.service', () => {
 
       const sentText = mockEmailSend.mock.calls[0][0].text as string;
       expect(sentText).toContain('Hello noname@test.com');
-    });
-
-    it('should throw when super admin user is not found before reading contact config', async () => {
-      const strapi = getStrapi();
-      const service = getService(strapi);
-      const entity = {
-        id: 1,
-        content: 'Reply content',
-        threadOf: {
-          id: 10,
-          author: { name: 'Thread Author', email: 'thread@test.com' },
-        },
-        author: { name: 'Replier', email: 'replier@test.com' },
-      };
-
-      mockAdminUserQuery.findOne.mockResolvedValue(null);
-
-      await expect(service.sendResponseNotification(entity as any)).rejects.toThrow(
-        /Cannot read properties of null \(reading 'email'\)/,
-      );
-
-      expect(mockCommonService.getConfig).not.toHaveBeenCalled();
-      expect(mockEmailSend).not.toHaveBeenCalled();
     });
 
     it('should not send when threadOf has no author and no authorUser', async () => {
