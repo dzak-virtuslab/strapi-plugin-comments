@@ -472,6 +472,18 @@ const commonService = ({ strapi }: StrapiContext) => ({
     });
   },
 
+  async reopenAbuseReport(commentId: Id, reportId: Id) {
+    return getReportCommentRepository(strapi).update({
+      where: {
+        id: reportId,
+        related: commentId,
+      },
+      data: {
+        resolved: false,
+      },
+    });
+  },
+
   async resolveCommentMultipleAbuseReports(commentId: Id, reportIds: number[]) {
     const reports = await getReportCommentRepository(strapi).findMany({
       where: {

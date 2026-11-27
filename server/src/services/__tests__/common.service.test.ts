@@ -1316,6 +1316,32 @@ describe('common.service', () => {
     });
   });
 
+  describe('reopenAbuseReport', () => {
+    it('should mark report unresolved for comment', async () => {
+      const strapi = getStrapi();
+      const service = getService(strapi);
+      const mockReport = { id: 1, resolved: true };
+
+      mockReportCommentRepository.update.mockResolvedValue({
+        ...mockReport,
+        resolved: false,
+      });
+
+      const result = await service.reopenAbuseReport(1, 1);
+
+      expect(result.resolved).toBe(false);
+      expect(mockReportCommentRepository.update).toHaveBeenCalledWith({
+        where: {
+          id: 1,
+          related: 1,
+        },
+        data: {
+          resolved: false,
+        },
+      });
+    });
+  });
+
   describe('resolveCommentMultipleAbuseReports', () => {
     it('should resolve multiple abuse reports for a comment', async () => {
       const strapi = getStrapi();
