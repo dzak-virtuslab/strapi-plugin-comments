@@ -348,12 +348,8 @@ export const clientService = ({ strapi }: StrapiContext) => {
                 `,
               });
           } catch (err) {
+            // Best-effort and not awaited by create(): log here, don't rethrow
             strapi.log.error(err);
-
-            throw new PluginError(
-              500,
-              `Failed to send response notification email`,
-            );
           }
         }
       }

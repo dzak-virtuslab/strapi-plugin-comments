@@ -1148,7 +1148,7 @@ describe('client.service', () => {
       expect(mockEmailSend).not.toHaveBeenCalled();
     });
 
-    it('should throw PluginError(500) when emailService send fails', async () => {
+    it('should log once and not rethrow when emailService send fails', async () => {
       const strapi = getStrapi();
       const service = getService(strapi);
       const entity = {
@@ -1168,12 +1168,9 @@ describe('client.service', () => {
       const sendError = new Error('SMTP down');
       mockEmailSend.mockRejectedValueOnce(sendError);
 
-      await expect(service.sendResponseNotification(entity as any)).rejects.toMatchObject({
-        name: 'Strapi:Plugin:Comments',
-        status: 500,
-        message: 'Failed to send response notification email',
-      });
+      await expect(service.sendResponseNotification(entity as any)).resolves.toBeUndefined();
 
+      expect(mockLog.error).toHaveBeenCalledTimes(1);
       expect(mockLog.error).toHaveBeenCalledWith(sendError);
     });
 
